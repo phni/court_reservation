@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="card bg-dark text-light">
+        <div class="card-body">
+            <h1 class="mb-4">Reservations</h1>
+            {% for reservation in reservations %}
+            <div class="reservation-card mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <h3 class="mb-0 me-3">{{ reservation.title }}</h3>
+                        <span class="badge {% if reservation.is_closed %}bg-danger{% else %}bg-success{% endif %}">
+                            {% if reservation.is_closed %}Closed{% else %}Open{% endif %}
+                        </span>
+                    </div>
+                    <a href="{{ url_for('app.view_reservation', reservation_id=reservation.id) }}" 
+                       class="btn btn-primary">
+                        View Reservation
+                    </a>
+                </div>
+                <div class="row">
+                    {% for court in reservation.courts %}
+                    <div class="col-md-4 mb-3">
+                        <div class="court-box">
+                            <h4>Court {{ court.court_number }}</h4>
+                            <ul class="list-unstyled">
+                                {% for player in court.players %}
+                                <li>{{ player.name }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="text-muted">
+                    Created: {{ reservation.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                </div>
+            </div>
+            <hr class="border-secondary">
+            {% endfor %}
+            <a href="{{ url_for('app.home') }}" class="btn btn-secondary">Back to Home</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    body {
+        background-color: #121212;
+        color: #ffffff;
+    }
+    .card {
+        border-color: #2d2d2d;
+    }
+    .court-box {
+        background-color: #2d2d2d;
+        border: 1px solid #404040;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    .reservation-card {
+        background-color: #1d1d1d;
+        padding: 20px;
+        border-radius: 8px;
+    }
+    .btn-primary {
+        background-color: #2d5986;
+        border-color: #2d5986;
+    }
+    .btn-primary:hover {
+        background-color: #1d3d5c;
+        border-color: #1d3d5c;
+    }
+    .badge {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: normal;
+    }
+    .bg-success {
+        background-color: #1e4620 !important;
+    }
+    .bg-danger {
+        background-color: #4c1515 !important;
+    }
+</style>
+{% endblock %} 

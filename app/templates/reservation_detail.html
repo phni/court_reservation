@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="card bg-dark text-light">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>{{ reservation.title }}</h1>
+                <div class="action-buttons">
+                    {% if not reservation.is_closed %}
+                    <button onclick="addNewCourt()" class="btn btn-success me-2">Add Court</button>
+                    <button onclick="closeReservation()" class="btn btn-warning me-2">Close Poll</button>
+                    {% endif %}
+                    <button onclick="deleteReservation()" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+            
+            <div class="reservation-info mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Reservation Info</h3>
+                    {% if not reservation.is_closed %}
+                    <button onclick="toggleReservationEdit()" class="btn btn-primary btn-sm" id="editReservationBtn">
+                        Edit
+                    </button>
+                    {% endif %}
+                </div>
+                <form id="reservation-info-form" style="display: none;" method="post" action="{{ url_for('app.update_reservation', reservation_id=reservation.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" class="form-control bg-dark text-light" name="title" value="{{ reservation.title }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control bg-dark text-light" name="date" value="{{ reservation.date.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label class="form-label">Start Time</label>
+                            <input type="time" class="form-control bg-dark text-light" name="start_time" value="{{ reservation.start_time.strftime('%H:%M') }}">
+                        </div>
+                        <div class="col">
+                            <label class="form-label">End Time</label>
+                            <input type="time" class="form-control bg-dark text-light" name="end_time" value="{{ reservation.end_time.strftime('%H:%M') }}">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success">Save Changes</button>
+                    <button type="button" onclick="toggleReservationEdit()" class="btn btn-secondary">Cancel</button>
+                </form>
+                <div id="reservation-info-display">
+                    <p>Total Courts: {{ reservation.num_courts }}</p>
+                    <p>Players per Court: {{ reservation.participants_per_court }}</p>
+                    <p>Date: {{ reservation.date.strftime('%Y-%m-%d') }}</p>
+                    <p>Time: {{ reservation.start_time.strftime('%H:%M') }} - {{ reservation.end_time.strftime('%H:%M') }}</p>
+                    <p>Duration: {{ (reservation.end_time.hour * 60 + reservation.end_time.minute - reservation.start_time.hour * 60 - reservation.start_time.minute) // 60 }}h {{ (reservation.end_time.hour * 60 + reservation.end_time.minute - reservation.start_time.hour * 60 - reservation.start_time.minute) % 60 }}m</p>
+                    <p>Status: {% if reservation.is_closed %}Closed{% else %}Open{% endif %}</p>
+                </div>
+            </div>
+
+            <form id="players-form" method="post" action="{{ url_for('app.update_players', reservation_id=reservation.id) }}">
+                <div class="row" id="courts-container">
+                    {% for court in reservation.courts %}
+                    <div class="col-md-4 mb-4">
+                        <div class="court-box">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h3 class="court-title">Court {{ court.court_number }}</h3>
+                                {% if not reservation.is_closed %}
+                                    <button onclick="removeCourt({{ court.id }})" 
+                                            class="btn btn-outline-danger btn-sm remove-btn"
+                                            data-court-id="{{ court.id }}"
+                                            title="Remove court">
+                                        Remove
+                                    </button>
+                                {% endif %}
+                            </div>
+                            <div class="player-list">
+                                {% for j in range(1, reservation.participants_per_court + 1) %}
+                                    {% set player = court.players[j-1] if j <= court.players|length else None %}
+                                    <div class="player-item {% if not player %}empty-player{% endif %}">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <input type="text" 
+                                                   class="player-input form-control bg-dark text-light me-2"
+                                                   name="court_{{ court.court_number }}_player_{{ j }}"
+                                                   value="{{ player.name if player else '' }}"
+                                                   placeholder="Player {{ j }}"
+                                                   oninput="handlePlayerInput(this)"
+                                                   {% if reservation.is_closed %}disabled{% endif %}
+                                                   data-original-disabled="{% if reservation.is_closed %}true{% endif %}">
+                                            {% if not reservation.is_closed %}
+                                                <button type="submit" 
+                                                        class="btn btn-primary btn-sm save-btn" 
+                                                        style="display: none;">Save</button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if not reservation.is_closed %}
+                <button type="submit" class="btn btn-success mt-3" id="saveBtn" style="display: none;">Save Changes</button>
+                {% endif %}
+            </form>
+
+            <div class="mt-4">
+                <a href="{{ url_for('app.view_reservations') }}" class="btn btn-secondary">Back to Reservations</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body {
+        background-color: #121212;
+    }
+    .card {
+        border-color: #2d2d2d;
+        background-color: #1a1a1a;
+    }
+    .court-box {
+        background-color: #2d2d2d;
+        border: 1px solid #404040;
+        padding: 20px;
+        border-radius: 8px;
+    }
+    .court-title {
+        color: #fff;
+        border-bottom: 1px solid #404040;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    .player-item {
+        background-color: #363636;
+        padding: 8px 15px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        color: #fff;
+    }
+    .reservation-info {
+        background-color: #2d2d2d;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .reservation-info p {
+        margin-bottom: 5px;
+        color: #ddd;
+    }
+    .empty-player {
+        background-color: #363636;
+        opacity: 0.6;
+        padding: 8px 15px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        color: #aaa;
+    }
+    .player-input {
+        background-color: transparent;
+        border: none;
+        width: 100%;
+        color: inherit;
+    }
+    .player-input:disabled {
+        background-color: transparent;
+        opacity: 0.7;
+    }
+    .player-input:focus {
+        background-color: #363636;
+        border: 1px solid #505050;
+        outline: none;
+    }
+</style>
+
+<script>
+function toggleEdit() {
+    const inputs = document.querySelectorAll('.player-input');
+    const saveBtn = document.getElementById('saveBtn');
+    const editBtn = document.getElementById('editBtn');
+    
+    // Check if reservation is closed
+    const isReservationClosed = {% if reservation.is_closed %}true{% else %}false{% endif %};
+    if (isReservationClosed) {
+        alert('Cannot edit a closed reservation');
+        return;
+    }
+    
+    saveBtn.style.display = saveBtn.style.display === 'none' ? 'block' : 'none';
+    editBtn.textContent = editBtn.textContent === 'Edit' ? 'Cancel' : 'Edit';
+}
+
+function closeReservation() {
+    if (confirm('Are you sure you want to close this reservation? This cannot be undone.')) {
+        fetch("{{ url_for('app.close_reservation', reservation_id=reservation.id) }}", {
+            method: 'POST'
+        }).then(() => window.location.reload());
+    }
+}
+
+function deleteReservation() {
+    if (confirm('Are you sure you want to delete this reservation? This cannot be undone.')) {
+        fetch("{{ url_for('app.delete_reservation', reservation_id=reservation.id) }}", {
+            method: 'DELETE'
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    alert(data.error || 'Failed to delete reservation');
+                    throw new Error('Failed to delete reservation');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                window.location.href = "{{ url_for('app.view_reservations') }}";
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete reservation');
+        });
+    }
+}
+
+function addNewCourt() {
+    fetch("{{ url_for('app.add_court', reservation_id=reservation.id) }}", {
+        method: 'POST'
+    }).then(() => window.location.reload());
+}
+
+function removeCourt(courtId) {
+    if (confirm('Are you sure you want to remove this court?')) {
+        fetch(`{{ url_for('app.remove_court', reservation_id=reservation.id) }}?court_id=${courtId}`, {
+            method: 'DELETE'
+        }).then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Cannot remove court with players');
+            }
+        });
+    }
+}
+
+function handlePlayerInput(input) {
+    const saveBtn = input.parentElement.querySelector('.save-btn');
+    const hasChanges = input.value !== input.defaultValue;
+    saveBtn.style.display = hasChanges ? 'inline-block' : 'none';
+    
+    // Store the original value when focusing
+    if (!input.dataset.originalValue) {
+        input.dataset.originalValue = input.value;
+    }
+    
+    // Check if any player input in this court has a value
+    const courtBox = input.closest('.court-box');
+    const playerInputs = courtBox.querySelectorAll('.player-input');
+    const hasPlayers = Array.from(playerInputs).some(input => 
+        input.value.trim() !== '' && input.value === input.dataset.originalValue
+    );
+    
+    // Show/hide remove button based on whether any players exist
+    const removeBtn = courtBox.querySelector('.remove-btn');
+    if (removeBtn) {
+        removeBtn.style.display = hasPlayers ? 'none' : 'block';
+    }
+}
+
+// Add this after the handlePlayerInput function
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('.player-input');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            if (!this.dataset.originalValue) {
+                this.dataset.originalValue = this.value;
+            }
+        });
+    });
+});
+
+function toggleReservationEdit() {
+    const form = document.getElementById('reservation-info-form');
+    const display = document.getElementById('reservation-info-display');
+    const editBtn = document.getElementById('editReservationBtn');
+    
+    if (form.style.display === 'none') {
+        form.style.display = 'block';
+        display.style.display = 'none';
+        editBtn.style.display = 'none';
+    } else {
+        form.style.display = 'none';
+        display.style.display = 'block';
+        editBtn.style.display = 'block';
+    }
+}
+</script>
+{% endblock %} 
